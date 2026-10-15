@@ -10,6 +10,7 @@ env/
 .ruff_cache/
 build/
 dist/
+*.pt
 
 # Local secrets and editor/OS files
 .env
@@ -29,3 +30,8 @@ logs/
 *.o
 *.elf
 *.hex
+
+# YOLO / dataset
+hedef_hizalama/yolo/dataset/
+runs/
+yolo11n.pt
