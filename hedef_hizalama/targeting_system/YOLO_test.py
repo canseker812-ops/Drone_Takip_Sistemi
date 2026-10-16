@@ -5,7 +5,7 @@ import cv2
 from ultralytics import YOLO
 
 # 1. BAŞLANGIÇ AYARLARI
-model = YOLO(r"C:\Users\Gebisis\Desktop\DroneTakip\Target-Tracking-Challenge\runs\detect\pars_v2_yolo11n_e50\weights\best.pt") # Modeli RAM'e yükle
+model = YOLO(r"C:\Users\Gebisis\Desktop\DroneTakip\Target-Tracking-Challenge\runs\detect\pars_v2_yolo11n_e50\weights\best.pt")
 kamera = cv2.VideoCapture(0, cv2.CAP_DSHOW) # Kamerayı başlat
 
 if not kamera.isOpened():
@@ -40,8 +40,6 @@ while True:
 
     if kutu_sayisi > 0:
         print("Durum : TAKİP") # Hedef bulundu, takip moduna geç
-        cv2.putText(cizili, "Durum: TAKİP", (20,40),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
-        cv2.putText(cizili, f"Hata X: {hata_x} | Hata Y: {hata_y}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
         # 5. HATA HESAPLAMA
         for kutu in sonuc[0].boxes:
@@ -53,13 +51,15 @@ while True:
 
             hata_x = cx - ekran_cx # Kırmızı nokta mavi noktadan sağa/sola ne kadar uzak hesapla
             hata_y = cy - ekran_cy # Kırmızı nokta mavi noktadan yukarı/aşağı ne kadar uzak hesapla
-            
+                    
             # 6. ÖLÜ BÖLGE (DEADZONE)
             olu_bolge = 30 # Motorların titremesini önlemek için 30 piksellik tolerans tanı
             if abs(hata_x) < olu_bolge: # Eğer X hatası -30 ile +30 arasındaysa...
                 hata_x = 0 # ...hatayı 0 kabul et (motor X dönmesin)
             if abs(hata_y) < olu_bolge: # Eğer Y hatası -30 ile +30 arasındaysa...
                 hata_y = 0 # ...hatayı 0 kabul et (motor Y dönmesin)
+            cv2.putText(cizili, "Durum: TAKİP", (20,40),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
+            cv2.putText(cizili, f"Hata X: {hata_x} | Hata Y: {hata_y}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
             hata_paketi = f"<{hata_x},{hata_y}>" # Hataları terminalde göster
             print(hata_paketi)
