@@ -39,7 +39,9 @@ while True:
     kutu_sayisi = len(sonuc[0].boxes) # Ekranda kaç tane hedef (kutu) var say
 
     if kutu_sayisi > 0:
-        print("Durum : TRACKING") # Hedef bulundu, takip moduna geç
+        print("Durum : TAKİP") # Hedef bulundu, takip moduna geç
+        cv2.putText(cizili, "Durum: TAKİP", (20,40),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
+        cv2.putText(cizili, f"Hata X: {hata_x} | Hata Y: {hata_y}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
         # 5. HATA HESAPLAMA
         for kutu in sonuc[0].boxes:
@@ -67,7 +69,8 @@ while True:
                 pass
     else:
         # 7. ARAMA DURUMU
-        print("Durum : SEARCHING") # Hedef yok, arama moduna geç
+        print("Durum : ARANIYOR") # Hedef yok, arama moduna geç
+        cv2.putText(cizili, "Durum: ARANIYOR", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         hata_x = 999 # Arduino'nun "hedef yok" durumunu anlaması için şifreli X hatası
         hata_y = 999 # Arduino'nun "hedef yok" durumunu anlaması için şifreli Y hatası
         durum_paketi = f"<{hata_x},{hata_y}>"
