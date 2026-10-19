@@ -1,5 +1,4 @@
 import cv2
-
 from takip_sistemi import TakipSistemi
 
 RENKLER = {
@@ -10,7 +9,6 @@ RENKLER = {
     "ACIL_DURDUR": (0, 0, 255),
     "HATA": (0, 0, 255),
 }
-
 
 def main():
     sistem = TakipSistemi()
@@ -32,7 +30,9 @@ def main():
             cv2.putText(kare, "q:cik b:baslat d:durdur e:ACIL r:reset",
                         (20, kare.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (255, 255, 255), 1)
-            cv2.imshow("Hedef Takip", kare)
+            
+            # DÜZELTİLEN KISIM: Streamlit kodu yerine OpenCV ile ekranda gösteriyoruz
+            cv2.imshow("Marmara Rover Arayuz", kare)
 
             tus = cv2.waitKey(1) & 0xFF
             if tus == ord("q"):
@@ -48,7 +48,6 @@ def main():
     finally:
         sistem.kapat()
         cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     main()
