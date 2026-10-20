@@ -1,13 +1,12 @@
-# Dataset ve YOLO modeli
+# 👁️ YOLO Algılayıcı (Detector) Modülü
 
-Dataset bilgilerini, eğitim sonuçlarını ve eğitilmiş YOLO modelini bu klasörde teslim edin. Drone veri setleri tarafımızdan sağlanmaktadır; adaylardan ayrıca veri seti araştırmaları beklenmemektedir. YOLO sürümü seçimi ve model eğitimi adaya aittir.
+Bu modül, Marmara Rover Otonom Takip Sistemi'nin görsel algılama yeteneğini oluşturur. 
 
-Sağlanan iki veri setinin bağlantıları [dataset/README.md](dataset/README.md) dosyasındadır. Eğitimde bu kaynaklardan kullanılan veri seti/sürüm bilgilerini belgeleyin.
+## 📌 Teknik Detaylar
+- **Model Mimarisi:** YOLO11n (Nano)
+- **Kullanılan Veri Seti:** PARS Dataset V2
+- **Başarı Metriği:** 0.992 mAP50
+- **Ağırlık Dosyası:** `best.pt`
 
-- `dataset/`: veri seti kaynağı, kullanım/lisans bilgisi, sınıflar ve eğitim/doğrulama/test bölünmesi gibi açıklamalar.
-- `results/`: eğitim sonuçları, tespit başarısını gösteren ölçümler ve örnek çıktılar.
-- `models/`: eğitilmiş model dosyası ve hangi eğitimden üretildiğini açıklayan bilgiler.
-
-Kullanılan eğitim komutunu ve modelin targeting_system tarafından nasıl yüklendiğini belgeleyin. Büyük model/veri dosyaları için Git LFS kullanılabilir.
-
-Repo kökündeki [hedef-drone.jpeg](../../hedef-drone.jpeg) görevin hedef referans fotoğrafıdır; tek başına eğitilmiş model veya eğitim veri seti değildir.
+## 🚀 Çalışma Mantığı
+Kameradan alınan anlık BGR formatındaki görüntü kareleri modele beslenir. Model, hedef nesnenin görüntü üzerindeki koordinatlarını (Bounding Box - Merkez X, Merkez Y) milisaniyeler içinde çıkararak Targeting System'e (Hedefleme Sistemine) aktarır.
