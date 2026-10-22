@@ -1,7 +1,3 @@
-// --- MARMARA ROVER: YÜKSEK HASSASİYETLİ OTONOM TAKİP SİSTEMİ ---
-// Geliştirici: Şeker Can Şeker & AI Copilot
-// Algoritma: Bresenham Linear Interpolation & Non-blocking UART
-
 #define STEP_X 2
 #define DIR_X 3
 #define STEP_Y 4
@@ -9,15 +5,13 @@
 
 bool acilDurum = false;
 
-// Motor hızı (Mikrosaniye). TMC2209 mikroadım (1/16 veya 1/32) modundaysa 
-// bu değeri 200-400 aralığına kadar düşürüp inanılmaz pürüzsüz hızlar elde edebilirsin.
+// Step motor delay'i (TMC2209 mikroadım için 200-400 arası pürüzsüz sonuç veriyor)
 const int motorBekleme = 600; 
 
 void setup() {
   Serial.begin(115200);
   
-  // PROFESYONEL DOKUNUŞ: Varsayılan 1000ms (1 saniye) UART bekleme süresini 5ms'ye düşürüyoruz.
-  // Bu sayede koptuktan veya bozuk paket geldikten sonra sistem "donup kalmaz", anında toparlar.
+  // Veri akışı koparsa veya bozulursa Arduino'nun kilitlenmemesi için timeout süresini kısalttık
   Serial.setTimeout(5);
   
   pinMode(STEP_X, OUTPUT);
@@ -41,7 +35,7 @@ void loop() {
 }
 
 void komutIsle(String paket) {
-  // 1. GÜVENLİK (INTERRUPT) KONTROLLERİ
+  // E-stop ve Reset kesmeleri
   if (paket == "E") {
     acilDurum = true;
     return;
@@ -50,9 +44,10 @@ void komutIsle(String paket) {
     acilDurum = false;
     return;
   }
-  if (acilDurum) return; // Sistem kilitliyse paketleri görmezden gel
+  
+  // Sistem kilitliyse motor hareket komutlarını atla
+  if (acilDurum) return; 
 
-  // 2. PAKET ÇÖZÜMLEME (PARSING)
   int virgulIndex = paket.indexOf(',');
   if (virgulIndex > 0) {
     long adimX = paket.substring(0, virgulIndex).toInt();
@@ -67,11 +62,8 @@ void komutIsle(String paket) {
   }
 }
 
-// -------------------------------------------------------------------------
-// BRESENHAM ÇİZGİ ALGORİTMASI İLE KUSURSUZ (TİTREŞİMSİZ) VEKTÖREL HAREKET
-// -------------------------------------------------------------------------
+// X ve Y eksenlerinin merdiven (step) yapmadan çapraz gidebilmesi için Bresenham mantığı kullanıldı
 void hassasVektorSurus(long adimX, long adimY) {
-  // Yönleri ayarla ve sayıları mutlak (pozitif) değere çevir
   long dx = abs(adimX);
   long dy = abs(adimY);
   long sx = (adimX > 0) ? 1 : -1;
@@ -80,23 +72,18 @@ void hassasVektorSurus(long adimX, long adimY) {
   digitalWrite(DIR_X, sx > 0 ? HIGH : LOW);
   digitalWrite(DIR_Y, sy > 0 ? HIGH : LOW);
 
-  // Bresenham hata payı hesaplayıcısı
   long err = (dx > dy ? dx : -dy) / 2;
   long e2;
   
   long currentX = 0;
   long currentY = 0;
 
-  // Motorlar hedef adımlarına ulaşana kadar döngü çalışır
   while (currentX < dx || currentY < dy) {
-    
-    // Güvenlik: Hareket halindeyken Acil Durdurma paketi geldiyse fren yap!
+    // Uzun hareket esnasında araya acil durum girerse kör gitmesin diye buffer'a peek atıyoruz
     if (Serial.available() > 0 && Serial.peek() == '<') {
       break; 
     }
 
-    // Hangi motorun adım atması gerektiğine hata payına (err) göre karar verilir.
-    // Bu sayede motorlar "merdiven" gibi değil, "dümdüz bir çizgi" (diagonal) şeklinde hedefe gider.
     e2 = err;
     if (e2 > -dx && currentX < dx) {
       err -= dy;
@@ -109,26 +96,22 @@ void hassasVektorSurus(long adimX, long adimY) {
       currentY++;
     }
 
-    // TMC2209 için gerekli minimum HIGH pals süresi (Çok kısa olmalı)
     delayMicroseconds(5); 
     
     digitalWrite(STEP_X, LOW);
     digitalWrite(STEP_Y, LOW);
     
-    // Hareketin hızını belirleyen ana bekleme süresi
     delayMicroseconds(motorBekleme); 
   }
 }
 
-// -------------------------------------------------------------------------
-// HEDEF KAYIPKEN YUMUŞAK TARAMA MODU
-// -------------------------------------------------------------------------
 void aramaHareketiniYap() {
+  // Hedef kadrajda yokken yavaşça sağa dön
   digitalWrite(DIR_X, HIGH);
   for(int i = 0; i < 30; i++) {
     digitalWrite(STEP_X, HIGH);
     delayMicroseconds(5);
     digitalWrite(STEP_X, LOW);
-    delayMicroseconds(motorBekleme * 2); // Aramayı daha sarsıntısız ve yavaş yap
+    delayMicroseconds(motorBekleme * 2); // Arama hızı normalden daha yavaş
   }
 }

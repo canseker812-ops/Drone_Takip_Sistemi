@@ -1,8 +1,10 @@
 import sys
 import os
+import time
 import cv2
 import streamlit as st
 
+# Targeting dizinini bulup yola ekliyoruz ki import patlamasın
 mevcut_dizin = os.path.dirname(os.path.abspath(__file__))
 ust_dizin = os.path.abspath(os.path.join(mevcut_dizin, '..'))
 
@@ -35,7 +37,7 @@ st.markdown("""
     
     .status-box {
         padding: 18px; border-radius: 8px; text-align: center; font-size: 22px; font-weight: 800;
-        letter-spacing: 2px; margin-bottom: 25px; text-transform: uppercase;
+        letter-spacing: 2px; margin-bottom: 15px; text-transform: uppercase;
         box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
     }
     .status-TAKIP { background-color: rgba(46, 160, 67, 0.1); color: #3fb950; border: 2px solid #3fb950; }
@@ -57,16 +59,6 @@ st.markdown("""
     
     [data-testid="stButton"] > button[kind="primary"] { background-color: #da3633 !important; color: white !important; border: none !important; }
     [data-testid="stButton"] > button[kind="primary"]:hover { background-color: #b62324 !important; }
-    
-    .zero-latency-box {
-        background-color: #161b22;
-        border: 1px dashed #30363d;
-        border-radius: 8px;
-        padding: 100px 20px;
-        text-align: center;
-        color: #8b949e;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -88,16 +80,11 @@ st.markdown("<hr style='margin-top: 15px; margin-bottom: 15px;'>", unsafe_allow_
 cam_col, panel_col = st.columns([7, 3])
 
 with cam_col:
-    st.markdown("""
-    <div class='zero-latency-box'>
-        <h3 style='color: #ffffff; font-weight: 700;'>⚡ Sıfır Gecikme (Zero-Latency) Modu Aktif</h3>
-        <p style='font-size: 18px; margin-top: 15px;'>Görüntü işleme performansını korumak için kamera akışı donanımsal pencereye aktarıldı.</p>
-        <p style='color: #3fb950; font-weight: 600;'>Lütfen görev çubuğunuzda açılan <b>'Marmara Rover - Canli Kamera'</b> penceresine bakınız.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    kamera_alani = st.empty()
 
 with panel_col:
     durum_alani = st.empty() 
+    yon_tablosu = st.empty() 
     
     c1, c2 = st.columns(2)
     btn_baslat = c1.button("▶ Start", use_container_width=True)
@@ -109,18 +96,11 @@ with panel_col:
     btn_reset = c3.button("🔄 Reset", use_container_width=True)
     btn_acil = c4.button("🛑 Emergency Stop", type="primary", use_container_width=True)
 
-    if btn_baslat: 
-        st.session_state.sistem.baslat()
-        st.rerun()
-    if btn_durdur: 
-        st.session_state.sistem.durdur()
-        st.rerun()
-    if btn_reset: 
-        st.session_state.sistem.reset()
-        st.rerun()
-    if btn_acil: 
-        st.session_state.sistem.acil_durdur()
-        st.rerun()
+    # st.rerun() kullanmıyoruz, butona çift basmayı yutuyordu
+    if btn_baslat: st.session_state.sistem.baslat()
+    if btn_durdur: st.session_state.sistem.durdur()
+    if btn_reset: st.session_state.sistem.reset()
+    if btn_acil: st.session_state.sistem.acil_durdur()
 
 DURUM_ISIMLERI = {
     "BEKLEMEDE": "SİSTEM BEKLEMEDE",
@@ -131,25 +111,34 @@ DURUM_ISIMLERI = {
     "HATA": "SİSTEM HATASI"
 }
 
-# Döngü optimizasyon sayacı
-# Döngü optimizasyon sayacı ve durum takipçisi
 sayac = 0 
 son_durum = "" 
+dondurulmus_kare = None 
 
 while True:
     kare, bilgi = st.session_state.sistem.adim()
     
     if kare is None:
-        cv2.destroyAllWindows()
+        kamera_alani.error("Kamera koptu veya başlatılamadı.")
         break
 
-    # 1. GÖRÜNTÜYÜ DONANIMSAL PENCEREDE AÇ (Sıfır Gecikme)
-    cv2.imshow("Marmara Rover - Canli Kamera", kare)
-    cv2.waitKey(1)
-    
     mevcut_durum = bilgi["durum"]
+
+    # E-stop'a basılırsa kamerayı kapatmıyoruz, sadece son kareyi ekranda donduruyoruz
+    if mevcut_durum == "ACIL_DURDUR":
+        if dondurulmus_kare is None:
+            dondurulmus_kare = cv2.cvtColor(kare, cv2.COLOR_BGR2RGB)
+            
+        gosterilecek_kare = dondurulmus_kare.copy()
+        cv2.putText(gosterilecek_kare, "ACIL DURDURMA AKTIF - KILITLI", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+        kamera_alani.image(gosterilecek_kare, channels="RGB")
+    else:
+        # Normal akış
+        kare_rgb = cv2.cvtColor(kare, cv2.COLOR_BGR2RGB)
+        dondurulmus_kare = None 
+        kamera_alani.image(kare_rgb, channels="RGB")
     
-    # 2. DURUM KUTUSU OPTİMİZASYONU: Sadece durum değiştiğinde ANINDA tetiklenir (Gecikme 0)
+    # Durum paneli güncellemeleri
     if mevcut_durum != son_durum or mevcut_durum == "ACIL_DURDUR":
         gosterilecek_metin = DURUM_ISIMLERI.get(mevcut_durum, mevcut_durum)
         
@@ -159,13 +148,47 @@ while True:
         elif mevcut_durum in ["ACIL_DURDUR", "HATA"]: css_class = "status-ACIL_DURDUR"
         
         durum_alani.markdown(f"<div class='status-box {css_class}'>{gosterilecek_metin}</div>", unsafe_allow_html=True)
-        son_durum = mevcut_durum  # Yeni durumu hafızaya al
+        son_durum = mevcut_durum  
         
-    # 3. METRİK OPTİMİZASYONU: UI şişmesin diye 5 karede bir güncellenir
-    if sayac % 5 == 0 or mevcut_durum == "ACIL_DURDUR":
+    # Arayüz kasmaması için UI güncellemelerini her 3 karede bir yapıyoruz
+    if sayac % 3 == 0 or mevcut_durum == "ACIL_DURDUR":
         m_hata_x.metric(label="PİD Error (Yaw X)", value=f"{bilgi['hata_x']} px")
         m_hata_y.metric(label="PİD Error (Pitch Y)", value=f"{bilgi['hata_y']} px")
         m_adim_x.metric(label="Step Motor Data (X)", value=f"{bilgi['adim_x']}")
         m_adim_y.metric(label="Step Motor Data (Y)", value=f"{bilgi['adim_y']}")
+
+        if mevcut_durum == "ARANIYOR":
+            x_yon = "<span style='color:#d29922;'>Hedef Aranıyor 🔍</span>"
+            y_yon = "<span style='color:#d29922;'>Hedef Aranıyor 🔍</span>"
+        elif mevcut_durum == "ACIL_DURDUR":
+            x_yon = "<span style='color:#f85149;'>Sistem Kilitli 🛑</span>"
+            y_yon = "<span style='color:#f85149;'>Sistem Kilitli 🛑</span>"
+        else:
+            if bilgi['adim_x'] > 0: x_yon = "<span style='color:#3fb950;'>+X Yönünde ➡️</span>"
+            elif bilgi['adim_x'] < 0: x_yon = "<span style='color:#f85149;'>-X Yönünde ⬅️</span>"
+            else: x_yon = "<span style='color:#8b949e;'>Merkezde 🟢</span>"
+
+            if bilgi['adim_y'] > 0: y_yon = "<span style='color:#d29922;'>-Y Yönünde ⬇️</span>"
+            elif bilgi['adim_y'] < 0: y_yon = "<span style='color:#58a6ff;'>+Y Yönünde ⬆️</span>"
+            else: y_yon = "<span style='color:#8b949e;'>Merkezde 🟢</span>"
+
+        tablo_html = f"""
+        <div style='background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);'>
+            <div style='color: #8b949e; font-size: 13px; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px;'>📍 HEDEF HAREKET VEKTÖRÜ</div>
+            <div style='display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 16px;'>
+                <span style='color: #c9d1d9; font-weight: 600;'>Yatay Eksen (Yaw):</span>
+                <span style='font-weight: 700;'>{x_yon}</span>
+            </div>
+            <div style='display: flex; justify-content: space-between; font-size: 16px;'>
+                <span style='color: #c9d1d9; font-weight: 600;'>Dikey Eksen (Pitch):</span>
+                <span style='font-weight: 700;'>{y_yon}</span>
+            </div>
+        </div>
+        """
+        yon_tablosu.markdown(tablo_html, unsafe_allow_html=True)
         
     sayac += 1
+    
+    # Streamlit ve OpenCV'nin CPU'yu boğmaması için ufak bir bekleme ekliyoruz, yoksa UI kitlenir
+    cv2.waitKey(1)
+    time.sleep(0.03)

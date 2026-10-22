@@ -1,58 +1,50 @@
-import time
-
 import serial
-
+import time
 import config
 
-
 class SeriBaglanti:
-    """Arduino ile UART haberleşmesi. Hata olursa program çökmez, bagli=False olur."""
-
-    def __init__(self, port=None, baud=None):
+    """Python ile Arduino UNO arasındaki yüksek hızlı (115200 Baud) paket haberleşmesini yönetir."""
+    
+    def __init__(self):
         self.port = None
-        port = port or config.SERI_PORT
-        baud = baud or config.BAUD
+        self.bagli = False
+        
         try:
-            self.port = serial.Serial(port, baud, timeout=0.01)
-            time.sleep(2)  # UNO port açılınca resetlenir, bekle
-            print(f"Mikrodenetleyiciye bağlandı ({port}).")
-        except serial.SerialException as hata:
-            print(f"Seri port açılamadı ({port}): {hata}")
+            # timeout=0 komutu non-blocking çalışmasını sağlar, yani Arduino'dan cevap gelmezse Python kodunu dondurmaz
+            self.port = serial.Serial(config.SERI_PORT, config.BAUD, timeout=0)
+            self.bagli = True
+            time.sleep(2) # Arduino'nun seri port açılırken attığı boot restart'ını bekliyoruz
+            self.port.reset_input_buffer()
+        except Exception as e:
+            # Kablo koptuğunda veya port yanlış girildiğinde kod çökmesin, sadece konsola hata bassın
+            print(f"UYARI: Arduino'ya bağlanılamadı ({config.SERI_PORT}). Hata: {e}")
+            self.bagli = False
 
-    @property
-    def bagli(self):
-        return self.port is not None
-
-    def gonder(self, paket):
-        """Paketi satır sonuyla gönderir. Başarılıysa True."""
-        if self.port is None:
-            return False
+    def gonder(self, mesaj):
+        """String paketi (örn: <15,-5> veya <E>) bytelara çevirip UART hattına sürer."""
+        if not self.bagli:
+            return
+            
         try:
-            self.port.write((paket + "\n").encode("utf-8"))
-            return True
-        except serial.SerialException as hata:
-            print(f"Seri yazma hatası, bağlantı koptu: {hata}")
-            self.port = None
-            return False
+            self.port.write(mesaj.encode('utf-8'))
+        except Exception:
+            self.bagli = False # Gönderim anında kablo çıkarsa durumu güncelle
 
     def oku(self):
-        """Arduino'dan gelen satırları liste olarak döndürür (ESTOP, OK, ERR)."""
+        """Arduino'dan dönen telemetry veya ACK loglarını toplar. (Dashboard'da göstermek için)"""
         satirlar = []
-        if self.port is None:
-            return satirlar
-        try:
-            while self.port.in_waiting > 0:
-                satir = self.port.readline().decode("utf-8", errors="ignore").strip()
-                if satir:
-                    satirlar.append(satir)
-        except serial.SerialException:
-            self.port = None
+        if self.bagli and self.port.in_waiting > 0:
+            try:
+                # Buffer'da bekleyen tüm satırları temizleyene kadar oku
+                okunan = self.port.readlines()
+                for satir in okunan:
+                    satirlar.append(satir.decode('utf-8', errors='ignore').strip())
+            except Exception:
+                pass
         return satirlar
 
     def kapat(self):
-        if self.port is not None:
-            try:
-                self.port.close()
-            except serial.SerialException:
-                pass
-            self.port = None
+        # İşletim sistemi portu kilitli bırakmasın diye çıkışta güvenli kapatma
+        if self.bagli and self.port.is_open:
+            self.port.close()
+            self.bagli = False
