@@ -1,32 +1,46 @@
 import time
+import config
 
 class PID:
     """NEMA 17 motorların hedefe ani zıplamalar yapmadan, pürüzsüz (yumuşak) gitmesini sağlayan kontrolcü."""
     
-    def __init__(self, kp, ki, kd, cikis_siniri=None):
+    def __init__(self, kp, ki, kd, cikis_siniri=None, integral_limit=None):
         self.kp = kp
         self.ki = ki
         self.kd = kd
         
         self.cikis_siniri = cikis_siniri
-        self.onceki_hata = 0
-        self.integral = 0
+        # Integral windup sınırını config'den al, parametre ile geçersiz kılınabilir
+        self.integral_limit = integral_limit if integral_limit is not None else getattr(config, 'INTEGRAL_LIMIT', 100.0)
+        self.onceki_hata = 0.0
+        self.integral = 0.0
         self.son_zaman = time.perf_counter()
 
     def hesapla(self, hata):
-        # Döngüler arası geçen süreyi (dt) buluyoruz, böylece FPS düşse bile D (Türev) sapıtmıyor
+        """
+        Verilen hata değerine göre PID çıkışını hesaplar.
+        Döngüler arası gerçek zaman farkı (dt) kullanılarak FPS bağımsız çalışır.
+        """
         simdi = time.perf_counter()
         dt = simdi - self.son_zaman
+
+        # Aşırı büyük dt değerleri (sistem duraksadığında) türev patlamasına yol açar
+        # dt'yi makul bir üst sınırla kırpıyoruz
         if dt <= 0.0:
-            dt = 1e-4 # Sıfıra bölme hatasından kaçınmak için mikro bir sapma payı
-            
+            dt = 1e-4  # Sıfıra bölme hatasından kaçınmak için mikro bir sapma payı
+        elif dt > 0.5:
+            dt = 0.5   # 500ms üzerindeki duraklamalarda türev çılgına dönmesin
+
         self.son_zaman = simdi
 
         # P (Proportional) - Anlık hata orantısı
         p_cikis = self.kp * hata
         
-        # I (Integral) - Zamanla biriken hata (Windup korumalı kurgulandı)
+        # I (Integral) - Zamanla biriken hata (Anti-windup ile korumalı)
         self.integral += hata * dt
+        # Integral windup'ı önlemek için integralı sınırlıyoruz
+        if self.integral_limit is not None:
+            self.integral = max(-self.integral_limit, min(self.integral_limit, self.integral))
         i_cikis = self.ki * self.integral
         
         # D (Derivative) - Hatanın değişim hızı (Hedefe yaklaşırken motoru frenler)
@@ -48,6 +62,6 @@ class PID:
         Sistem ARANIYOR moduna düştüğünde veya ölü bölgedeyken (hedef kilitliyken) çağrılır.
         Bu sayede I (Integral) şişmez ve hedef aniden hareket ettiğinde motorlar sarsılmaz.
         """
-        self.onceki_hata = 0
-        self.integral = 0
+        self.onceki_hata = 0.0
+        self.integral = 0.0
         self.son_zaman = time.perf_counter()
