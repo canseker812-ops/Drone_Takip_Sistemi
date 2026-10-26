@@ -21,7 +21,7 @@ Kamera görüntüsünde kırmızı renkli, 3B yazıcıyla üretilmiş drone mode
 
 ## Demo Videosu
 
-[Demo videosunu izle](VIDEO_LINKI_BURAYA)
+[Demo videosunu izle](https://github.com/user-attachments/assets/26d35eb2-c968-4257-900b-d56a379de59b)
 
 Videoda gösterilenler:
 1. Sistem açılışı ve canlı kamera görüntüsü
